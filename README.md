@@ -1,6 +1,6 @@
 # Field Service Platform
 
-A private project plan for an independent, mobile-first workforce and field-service SaaS platform.
+A private project plan and implementation repository for an independent, mobile-first workforce and field-service SaaS platform.
 
 ## Product goal
 
@@ -18,46 +18,40 @@ Use external systems through optional adapters during early releases:
 
 Native accounting and payroll will be added incrementally after the field-service workflow is validated with customers.
 
-## Core workflow
-
-```text
-Customer order
-  -> Job created
-  -> Worker assigned
-  -> Worker travels to site
-  -> GPS check-in
-  -> Checklist and work execution
-  -> Photos, materials, and costs recorded
-  -> Customer signature and stamped declaration
-  -> Job completed and approved
-  -> Incentive/payroll inputs calculated
-  -> Accounting/payroll export or integration
-  -> Complaint or warranty workflow if required
-```
-
 ## Technology direction
 
 - **Backend:** Rust, Axum, Tokio, SQLx, PostgreSQL.
 - **Mobile:** Kotlin Multiplatform for shared logic; Kotlin/Jetpack Compose for Android; Swift/SwiftUI for iOS.
-- **Admin web:** Start with a lightweight web application; use a full SPA only where it adds clear value.
-- **Jobs and workers:** Native Rust/PostgreSQL product modules.
-- **Files:** S3-compatible private object storage.
-- **Queues/cache:** Redis or Valkey where needed.
-- **External capabilities:** provider interfaces for maps, payments, notifications, and accounting/payroll integrations.
+- **Admin web:** Start lightweight and expand only where needed.
 
-## Repository plan
+## Repository status
 
-- `docs/` — product, architecture, data, workflows, security, and delivery plans.
-- `apps/mobile-worker/` — future native worker mobile application.
-- `apps/mobile-manager/` — future manager mobile application if responsive web is insufficient.
-- `apps/admin-web/` — operations, finance, HR, and administration interface.
-- `services/api/` — future Rust API and application modules.
-- `services/workers/` — future Rust background jobs and synchronization workers.
-- `services/integrations/` — provider adapters, including ERPNext/Frappe HR, accounting, payroll, maps, payments, and notifications.
-- `infrastructure/` — Docker, deployment, observability, and environment configuration.
+### Implemented (Phase 1 backend foundation)
 
-## MVP success criteria
+- Rust workspace at repository root.
+- API service in `services/api` with `/health` and `/ready`.
+- Environment configuration loading and validation.
+- SQLx PostgreSQL pool integration and startup migrations.
+- Initial tenant-owned schema migrations for organizations, users, roles, customers, sites, employees, service types, and audit events.
+- Tenant-boundary and audit abstractions with tests.
+- Local Docker Compose stack with API + PostgreSQL.
+- CI workflow for format, clippy, tests, and build checks.
 
-A manager can create or receive an order, assign a worker, and see the job completed with a checklist, timestamped GPS events, photos, costs, and customer signature. The system produces a completion document and makes approved attendance, cost, incentive, and payroll inputs available through export or an integration.
+### Planned next
 
-See the full plan in [`docs/`](docs/).
+- Domain modules for jobs, travel, checklist execution, evidence, costs, incentives, complaints, warranty, exports, and provider integrations.
+
+## Quick start
+
+```bash
+cp .env.example .env
+cargo run -p field-service-api
+```
+
+or:
+
+```bash
+docker compose up --build
+```
+
+See [`services/api/README.md`](services/api/README.md) for backend setup, migrations, and commands.
