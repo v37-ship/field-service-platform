@@ -3,44 +3,63 @@
 ## 1. Logical architecture
 
 ```text
-+----------------------+       HTTPS/API       +----------------------+
-| Worker mobile app    | <-------------------> | Frappe API layer     |
-| Manager mobile app   |                       | Custom Frappe app    |
-+----------------------+                       +----------+-----------+
-                                                          |
-                                  +-----------------------+-----------------------+
-                                  |                       |                       |
-                           ERPNext modules         Frappe HR              Background jobs
-                           orders/accounting       recruitment/payroll      notifications/reports
-                                  |                       |                       |
-                                  +-----------------------+-----------------------+
-                                                          |
-                           +------------------+-----------+------------------+
-                           |                  |                              |
-                    Database              Object storage                 Integrations
-                 business records       photos/documents/PDFs        maps, email, SMS, push
++-------------------------+       HTTPS/API       +--------------------------+
+| Worker mobile app       | <-------------------> | Rust API                 |
+| Android Kotlin/Compose  |                       | Axum + Tokio             |
+| iOS Swift/SwiftUI       |                       | Domain modules            |
++-------------------------+                       +------------+-------------+
+                                                               |
+                           +-----------------------------------+-----------------------------------+
+                           |                                   |                                   |
+                    PostgreSQL                         Background workers                 Object storage
+              operational and ledger data             sync, PDFs, notifications          photos/documents
+                           |                                   |                                   |
+                           +-----------------------+-----------+-------------------+---------------+
+                                                   |                               |
+                                           Provider adapters                 Admin web application
+                                    ERPNext/HR, maps, payments,          operations, finance, HR
+                                    accounting, payroll, messaging
 ```
 
 ## 2. Platform strategy
 
-Use ERPNext and Frappe HR as upstream applications. Implement domain-specific behavior in a separate custom Frappe app rather than editing upstream source. This preserves upgradeability and allows custom DocTypes, server-side validation, workflows, reports, permissions, and API endpoints.
+The core is a modular Rust application backed by PostgreSQL. Start as a modular monolith with clear domain boundaries. Split services only when scale, security, or operational isolation justifies it.
 
-Recommended custom app name: `field_service_platform`.
+Recommended components:
 
-## 3. Deployment environments
+- `services/api`: authentication, HTTP API, domain commands, queries, authorization.
+- `services/workers`: synchronization, document generation, notifications, exports, reconciliation.
+- `services/integrations`: provider interfaces and adapters.
+- `apps/mobile-worker`: offline-first native worker app.
+- `apps/admin-web`: dispatcher, supervisor, finance, HR, and configuration screens.
 
-- **Local development:** Docker or bench, seeded demo data, local object storage.
-- **Test/staging:** isolated database, object storage bucket, test notification providers, synthetic data.
-- **Production:** private network, managed backups, TLS, monitoring, restricted administrator access, separate storage and credentials.
+## 3. Core domain ownership
 
-## 4. Service boundaries
+The platform owns tenants, users, customers, sites, orders, jobs, assignments, schedules, travel events, checklists, media metadata, signatures, declarations, job costs, incentives, complaints, warranty claims, attendance events, and audit history.
 
-- Frappe/ERPNext remains the system of record for customers, orders, accounting, and standard HR/payroll records.
-- Custom app owns field jobs, assignments, checklists, travel events, completion evidence, declarations, incentive calculations, and domain workflows.
-- Mobile apps own local cache and an outbound action queue, not authoritative business state.
-- Object storage owns large binary files; the database stores metadata, hashes, permissions, and references.
+The platform initially creates exportable or synchronizable accounting/payroll inputs rather than attempting to implement every jurisdiction's accounting and payroll rules in the MVP.
 
-## 5. Synchronization model
+## 4. Integration strategy
+
+All external capabilities must use interfaces and adapters:
+
+```text
+MapProvider       -> routing, geocoding, distance, map tiles
+PaymentProvider   -> payment intent, refund, webhook, payout reference
+AccountingAdapter -> invoices, expenses, payments, journal/export records
+PayrollAdapter    -> attendance, deductions, reimbursements, incentives, salary inputs
+NotificationProvider -> email, SMS, push
+```
+
+Initial adapters may include ERPNext/Frappe HR, CSV/SFTP export, and one selected map/payment provider. Provider credentials are tenant-scoped and never embedded in domain logic.
+
+## 5. Deployment environments
+
+- **Local development:** Docker Compose, seeded PostgreSQL, local object storage, fake providers.
+- **Test/staging:** isolated database and storage, synthetic data, sandbox provider accounts.
+- **Production:** private network, managed PostgreSQL backups, TLS, monitoring, restricted administration, separate storage and credentials.
+
+## 6. Synchronization model
 
 - Each offline action has a client-generated UUID, device ID, user ID, local timestamp, entity ID, and operation type.
 - Server endpoints are idempotent using the action UUID.
@@ -48,14 +67,12 @@ Recommended custom app name: `field_service_platform`.
 - Entity versions or server timestamps detect conflicting edits.
 - Evidence uploads use resumable or retryable uploads where possible.
 
-## 6. Notifications
-
-Use server events/background jobs for push notifications, email, and SMS. Notifications must be advisory; the server remains authoritative for job status and approvals.
-
 ## 7. Key architectural decisions
 
-- Prefer modular monolith first; split services only when scale or isolation requires it.
-- Use server-side permission checks for every API operation.
+- Rust/PostgreSQL is the core platform; ERPNext/Frappe HR are optional integrations.
+- Native mobile apps are preferred for reliable camera, location, background work, storage, and battery behavior.
+- Financial records use append-only posting and reversal/adjustment workflows.
+- Payroll starts with one jurisdiction and explicit approval/lock periods.
 - Generate completion PDFs asynchronously and store their content hash.
 - Do not expose unrestricted object-storage URLs for identity documents.
 - Keep location tracking configurable per organization and job policy.

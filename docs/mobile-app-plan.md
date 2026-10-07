@@ -15,18 +15,29 @@ Primary flow:
 7. Capture customer signature and submit completion.
 8. See whether the submission is pending sync, under review, approved, or rejected.
 
-### Manager app
+### Manager/admin experience
 
 - Dispatch board and job list.
 - Worker availability and current status.
 - Map view for active jobs and recent location events where enabled.
 - Assignment, reassignment, escalation, approval, rejection, and exception handling.
 - Complaint and warranty triage.
-- Cost and incentive review.
+- Cost, incentive, export, and integration review.
 
-The manager app may initially be a responsive web app to reduce delivery risk.
+Start with a responsive admin web application. Build a separate manager mobile app only after pilot usage proves that dispatchers need it in the field.
 
-## 2. Offline-first design
+## 2. Mobile technology decision
+
+Avoid React Native and Flutter for the primary worker app because the product prioritizes native hardware integration, offline reliability, battery behavior, and a small runtime footprint.
+
+Use:
+
+- Android: Kotlin + Jetpack Compose.
+- iOS: Swift + SwiftUI.
+- Shared business/data logic: Kotlin Multiplatform where it reduces duplication without hiding platform-specific behavior.
+- Native platform integrations for camera, location, secure storage, background tasks, notifications, and signatures.
+
+## 3. Offline-first design
 
 Local data should include only the minimum required for assigned work. Store encrypted local records where the platform supports it.
 
@@ -37,7 +48,7 @@ Local data should include only the minimum required for assigned work. Store enc
 - Automatic retry with exponential backoff, but no silent loss.
 - If a job is changed by a manager while offline, show the conflict and preserve the worker's unsent evidence.
 
-## 3. Mobile security
+## 4. Mobile security
 
 - Short-lived access tokens with refresh mechanism.
 - Device registration and remote session revocation.
@@ -46,7 +57,7 @@ Local data should include only the minimum required for assigned work. Store enc
 - Camera capture should attach job context and prevent accidental upload to the wrong job.
 - Clear location permission explanation and worker consent record.
 
-## 4. UX requirements
+## 5. UX requirements
 
 - Large controls usable outdoors and with gloves.
 - Minimal typing; use selectable answers, voice notes where permitted, and barcode/QR scanning later.
@@ -54,7 +65,3 @@ Local data should include only the minimum required for assigned work. Store enc
 - Make evidence state obvious: local, uploading, synchronized, approved.
 - Preserve progress after app termination.
 - Support multiple languages and configurable labels.
-
-## 5. Suggested mobile implementation
-
-Start with a cross-platform framework such as React Native or Flutter, with a small native layer for background location, secure storage, camera, and notifications. The exact choice should be validated against the team's skills and required device support before implementation.
